@@ -85,3 +85,5 @@ docker-compose up --build -d
 2. **Projects**: Edit `frontend/src/components/Projects.tsx` with your real projects.
 3. **Contact**: Update `backend/.env` with your SMTP details.
 
+# Portfolio
+My Devops Portfolio
