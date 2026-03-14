@@ -8,8 +8,14 @@ import os
 import logging
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+file_handler = logging.FileHandler("backend.log")
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(stream_handler)
 
 from fastapi import Request
 from dotenv import load_dotenv
@@ -63,7 +69,7 @@ def send_email_background(form: ContactForm, sender_email: str, sender_password:
         msg['To'] = receiver_email
         msg['Reply-To'] = form.email
         msg['Subject'] = f"New Contact: {form.name}"
- 
+
         body = f"""
 New Contact Request
 ------------------
@@ -74,24 +80,44 @@ Message:
 {form.message}
 ------------------
 Sent from your Portfolio Website
-        """
+"""
         msg.attach(MIMEText(body, 'plain'))
 
-        # Connect to Gmail SMTP
-        logger.info(f"Connecting to SMTP server at smtp.gmail.com:587")
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.set_debuglevel(1)  # Enable debug output for SMTP
-        server.starttls()
+        # SMTP Configuration
+        smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        
+        logger.info(f"SMTP Step 1: Starting connection to {smtp_server}:{smtp_port}")
+        
+        server = None
+        if smtp_port == 465:
+            logger.info("SMTP Step 2: Using SMTP_SSL")
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=15)
+        else:
+            logger.info("SMTP Step 2: Using standard SMTP")
+            server = smtplib.SMTP(smtp_server, smtp_port, timeout=15)
+            logger.info("SMTP Step 3: Sending EHLO")
+            server.ehlo()
+            logger.info("SMTP Step 4: Starting TLS")
+            server.starttls()
+            logger.info("SMTP Step 5: Sending EHLO after TLS")
+            server.ehlo()
+            
+        logger.info("SMTP Step 6: Attempting login")
         server.login(sender_email, sender_password)
+        
+        logger.info(f"SMTP Step 7: Sending mail to {receiver_email}")
         refused = server.sendmail(sender_email, receiver_email, msg.as_string())
+        
         if refused:
             logger.error(f"Email delivery refused by SMTP server for: {refused}")
         else:
             logger.info(f"SMTP server accepted the message for {receiver_email}")
+            
         server.quit()
         logger.info(f"Background email successfully sent to {receiver_email}")
     except Exception as e:
-        logger.error(f"Failed to send background email: {str(e)}")
+        logger.error(f"Failed to send background email at step: {str(e)}", exc_info=True)
 
 @app.post("/contact")
 async def send_contact_email(form: ContactForm, background_tasks: BackgroundTasks):
