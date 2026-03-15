@@ -85,7 +85,7 @@ Sent from your Portfolio Website
 
         # SMTP Configuration
         smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_port = int(os.getenv("SMTP_PORT", "465"))
         
         logger.info(f"SMTP Step 1: Starting connection to {smtp_server}:{smtp_port}")
         
